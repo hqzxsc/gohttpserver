@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import time
 import hashlib
-
+import logging
 import tornado
 import tornado.ioloop
 import tornado.web
@@ -12,6 +11,9 @@ from tornado.options import define, options
 
 
 define("port", default=8200, help="Run server on a specific port", type=int) 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
@@ -23,7 +25,6 @@ class ProxyHandler(tornado.web.RequestHandler):
 
     @gen.coroutine
     def get(self, url):
-        print time.strftime('%Y-%m-%d %H:%M:%S'), 'PROXY http://' + url
         response = yield self.http_client.fetch('http://'+url) #www.google.com')
         # print response.body
         if (response.error and not
@@ -54,13 +55,16 @@ class PlistStoreHandler(tornado.web.RequestHandler):
         self.db[key] = body
         self.write({'key': key})
 
-    def get(self):
-        key = self.get_argument('key')
+    def get(self,key):
+        logger.info('key:%s'%key)
         value = self.db.get(key)
         if value is None:
             raise tornado.web.HTTPError(404)
         self.set_header('Content-Type', 'text/xml')
         self.finish(value)
+
+    def put(self):
+        self.db = {}
 
 
 def make_app(debug=True):
@@ -68,6 +72,7 @@ def make_app(debug=True):
         (r"/", MainHandler),
         (r"/proxy/(.*)", ProxyHandler),
         (r"/plist", PlistStoreHandler),
+        (r"/plist/(.*)", PlistStoreHandler),
     ], debug=debug)
 
 
